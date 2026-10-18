@@ -365,7 +365,28 @@ namespace client
 			bool DeleteStream (uint32_t recvStreamID);
 	};
 
-	class RunnableClientDestination: private i2p::util::RunnableService, public ClientDestination
+	// i2p-proxy patch: was `private i2p::util::RunnableService` (no permanent
+	// work guard). RunnableService::Run()'s `while (m_IsRunning)
+	// m_Service.run();` loop never calls io_context::restart() between
+	// iterations; per boost::asio's documented contract, once run() returns
+	// because it ran out of work, the io_context is left in a stopped state
+	// and every subsequent run() call returns immediately without executing
+	// any newly-posted handlers, forever. For a destination with sparse,
+	// bursty activity (exactly our embedding's usage pattern: create one
+	// destination, wait for tunnels, publish its LeaseSet) this is reachable
+	// in practice: LeaseSetDestination::Publish()'s retry chain
+	// (HandlePublishConfirmationTimer -> Publish() -> ...) silently stops
+	// forever the first time this destination's dedicated io_context
+	// happens to briefly have zero pending work between timer chains;
+	// observed directly on Windows (io_context::run() returning here appears
+	// more timing-sensitive under the IOCP backend than epoll), where the
+	// LeaseSet was never published and every peer's Dial() to this
+	// destination timed out. RouterContext's own service (RouterService,
+	// see RouterContext.h) already uses RunnableServiceWithWork for exactly
+	// this reason; RunnableClientDestination just wasn't using the same base
+	// class. Switching to RunnableServiceWithWork holds a permanent
+	// executor_work_guard so run() only returns via explicit Stop().
+	class RunnableClientDestination: private i2p::util::RunnableServiceWithWork, public ClientDestination
 	{
 		public:
 

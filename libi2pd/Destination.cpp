@@ -1695,7 +1695,7 @@ namespace client
 
 	RunnableClientDestination::RunnableClientDestination (const i2p::data::PrivateKeys& keys,
 		bool isPublic, const i2p::util::Mapping * params):
-		RunnableService ("Destination"), ClientDestination (GetIOService (), keys, isPublic, params)
+		RunnableServiceWithWork ("Destination"), ClientDestination (GetIOService (), keys, isPublic, params)
 	{
 		if (!GetNickname ().empty ())
 			RunnableService::SetName (GetNickname ());
